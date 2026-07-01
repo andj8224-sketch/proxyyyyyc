@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>代理</title>
+</head>
+<body>
+    <h1>Simple Proxy</h1>
+    <input type="text" id="url" placeholder="输入要访问的URL" style="width: 400px;">
+    <button onclick="proxy()">访问</button>
+    <div id="content" style="margin-top: 20px; border: 1px solid #ccc; padding: 10px;"></div>
+
+    <script>
+        function proxy() {
+            const targetUrl = document.getElementById('url').value;
+            if (!targetUrl) return;
+
+            fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(targetUrl))
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('content').innerHTML = '<pre>' + data.contents + '</pre>';
+                })
+                .catch(error => {
+                    document.getElementById('content').innerHTML = '错误: ' + error.message;
+                });
+        }
+    </script>
+</body>
+</html>
