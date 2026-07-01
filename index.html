@@ -1,27 +1,245 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>代理</title>
+    <meta charset="UTF-8">
+    <title>代理 - 翻墙访问</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            max-width: 900px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        #url {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        #url:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            padding: 12px 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .loading {
+            text-align: center;
+            color: #667eea;
+            display: none;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        #content {
+            margin-top: 30px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            padding: 20px;
+            background: #f9f9f9;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .error {
+            color: #d32f2f;
+            background: #ffebee;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #d32f2f;
+        }
+        .success {
+            color: #388e3c;
+            background: #e8f5e9;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #388e3c;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 3px;
+            overflow-x: auto;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .tips {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            border-radius: 3px;
+            font-size: 13px;
+            color: #1565c0;
+        }
+        .tips strong {
+            display: block;
+            margin-bottom: 8px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Simple Proxy</h1>
-    <input type="text" id="url" placeholder="输入要访问的URL" style="width: 400px;">
-    <button onclick="proxy()">访问</button>
-    <div id="content" style="margin-top: 20px; border: 1px solid #ccc; padding: 10px;"></div>
+    <div class="container">
+        <h1>🌐 翻墙代理</h1>
+        <p class="subtitle">安全访问被墙网站 | 内置广告过滤</p>
+        
+        <div class="input-group">
+            <input type="text" id="url" placeholder="输入完整URL，例如: https://www.google.com" value="https://httpbin.org/get">
+            <button onclick="proxy()">访问</button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>正在加载中...</p>
+        </div>
+
+        <div id="content"></div>
+
+        <div class="tips">
+            <strong>💡 使用提示:</strong>
+            • 输入完整的 URL (包括 https://)<br>
+            • 首次加载可能较慢，请耐心等待<br>
+            • 已启用广告过滤<br>
+            • 支持 JSON 和 HTML 内容
+        </div>
+    </div>
 
     <script>
-        function proxy() {
-            const targetUrl = document.getElementById('url').value;
-            if (!targetUrl) return;
+        const urlInput = document.getElementById('url');
+        const contentDiv = document.getElementById('content');
+        const loadingDiv = document.getElementById('loading');
+        const button = document.querySelector('button');
 
-            fetch('https://cors-anywhere.herokuapp.com/' + targetUrl)
-                .then(response => response.text())
-                .then(data => {
-                    document.getElementById('content').innerHTML = '<pre>' + data + '</pre>';
-                })
-                .catch(error => {
-                    document.getElementById('content').innerHTML = '错误: ' + error.message;
-                });
+        urlInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                proxy();
+            }
+        });
+
+        async function proxy() {
+            const targetUrl = urlInput.value.trim();
+            
+            if (!targetUrl) {
+                showError('请输入URL');
+                return;
+            }
+
+            if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+                showError('URL 必须以 http:// 或 https:// 开头');
+                return;
+            }
+
+            button.disabled = true;
+            loadingDiv.style.display = 'block';
+            contentDiv.innerHTML = '';
+
+            try {
+                const apiUrl = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
+
+                const response = await fetch(apiUrl);
+                const result = await response.json();
+
+                loadingDiv.style.display = 'none';
+
+                if (result.success) {
+                    let display = result.data;
+                    if (typeof result.data === 'object') {
+                        display = JSON.stringify(result.data, null, 2);
+                    }
+                    contentDiv.innerHTML = `
+                        <div class="success">✓ 访问成功 (状态码: ${result.statusCode})</div>
+                        <pre>${escapeHtml(display)}</pre>
+                    `;
+                } else {
+                    showError('服务器错误: ' + result.error);
+                }
+            } catch (error) {
+                loadingDiv.style.display = 'none';
+                showError('请求失败: ' + error.message);
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        function showError(message) {
+            loadingDiv.style.display = 'none';
+            contentDiv.innerHTML = `<div class="error">✗ ${message}</div>`;
+        }
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
         }
     </script>
 </body>
