@@ -14,7 +14,7 @@
             const targetUrl = document.getElementById('url').value;
             if (!targetUrl) return;
 
-            fetch('https://cors-anywhere.herokuapp.com/' + encodeURIComponent(targetUrl))
+            fetch('https://cors-anywhere.herokuapp.com/' + targetUrl)
                 .then(response => response.text())
                 .then(data => {
                     document.getElementById('content').innerHTML = '<pre>' + data + '</pre>';
