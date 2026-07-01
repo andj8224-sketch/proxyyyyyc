@@ -14,10 +14,10 @@
             const targetUrl = document.getElementById('url').value;
             if (!targetUrl) return;
 
-            fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(targetUrl))
-                .then(response => response.json())
+            fetch('https://cors-anywhere.herokuapp.com/' + encodeURIComponent(targetUrl))
+                .then(response => response.text())
                 .then(data => {
-                    document.getElementById('content').innerHTML = '<pre>' + data.contents + '</pre>';
+                    document.getElementById('content').innerHTML = '<pre>' + data + '</pre>';
                 })
                 .catch(error => {
                     document.getElementById('content').innerHTML = '错误: ' + error.message;
