@@ -34,47 +34,51 @@ const server = http.createServer((req, res) => {
     const targetUrl = queryUrl.query.url;
 
     if (!targetUrl) {
-      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ success: false, error: '缺少 URL 参数' }));
+      const errorMsg = JSON.stringify({ success: false, error: '缺少 URL 参数' });
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(errorMsg) });
+      res.end(errorMsg);
       return;
     }
 
     try {
       new URL(targetUrl);
     } catch (e) {
-      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ success: false, error: '无效的 URL' }));
+      const errorMsg = JSON.stringify({ success: false, error: '无效的 URL' });
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(errorMsg) });
+      res.end(errorMsg);
       return;
     }
 
     const protocol = targetUrl.startsWith('https') ? https : http;
-    let requestCompleted = false;
+    let responseSent = false;
 
     const options = {
       timeout: 15000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       }
     };
 
     const proxyReq = protocol.get(targetUrl, options, (response) => {
       let data = '';
       let dataSize = 0;
-      const maxSize = 5 * 1024 * 1024; // 5MB limit
+      const maxSize = 2 * 1024 * 1024; // 2MB limit
 
       response.on('data', (chunk) => {
-        dataSize += chunk.length;
-        if (dataSize > maxSize) {
-          data += chunk.toString().substring(0, maxSize - data.length);
-          response.destroy();
-        } else {
-          data += chunk;
+        if (!responseSent) {
+          dataSize += chunk.length;
+          if (dataSize > maxSize) {
+            data += chunk.toString().substring(0, maxSize - data.length);
+            response.destroy();
+          } else {
+            data += chunk;
+          }
         }
       });
 
       response.on('end', () => {
-        if (requestCompleted) return;
-        requestCompleted = true;
+        if (responseSent) return;
+        responseSent = true;
 
         try {
           const contentType = response.headers['content-type'] || '';
@@ -87,65 +91,87 @@ const server = http.createServer((req, res) => {
             } catch (e) {
               result = data;
             }
-          } else {
+          } else if (contentType.includes('text/html')) {
             // HTML - 移除广告和脚本
             result = removeAds(data);
           }
 
-          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-          res.end(JSON.stringify({
+          const responseMsg = JSON.stringify({
             success: true,
             statusCode: response.statusCode,
             contentType: contentType,
             data: result
-          }));
+          });
+
+          res.writeHead(200, { 
+            'Content-Type': 'application/json; charset=utf-8',
+            'Content-Length': Buffer.byteLength(responseMsg)
+          });
+          res.end(responseMsg);
         } catch (e) {
-          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-          res.end(JSON.stringify({
-            success: true,
-            statusCode: response.statusCode,
-            data: data
-          }));
+          const errorMsg = JSON.stringify({
+            success: false,
+            error: '处理响应失败: ' + e.message,
+            data: data.substring(0, 500)
+          });
+          res.writeHead(500, { 
+            'Content-Type': 'application/json; charset=utf-8',
+            'Content-Length': Buffer.byteLength(errorMsg)
+          });
+          res.end(errorMsg);
         }
       });
 
       response.on('error', (error) => {
-        if (requestCompleted) return;
-        requestCompleted = true;
-        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({
+        if (responseSent) return;
+        responseSent = true;
+        const errorMsg = JSON.stringify({
           success: false,
-          error: error.message
-        }));
+          error: '响应错误: ' + error.message
+        });
+        res.writeHead(500, { 
+          'Content-Type': 'application/json; charset=utf-8',
+          'Content-Length': Buffer.byteLength(errorMsg)
+        });
+        res.end(errorMsg);
       });
     });
 
     proxyReq.on('error', (error) => {
-      if (requestCompleted) return;
-      requestCompleted = true;
-      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({
+      if (responseSent) return;
+      responseSent = true;
+      const errorMsg = JSON.stringify({
         success: false,
-        error: error.message
-      }));
+        error: '请求错误: ' + error.message
+      });
+      res.writeHead(500, { 
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Length': Buffer.byteLength(errorMsg)
+      });
+      res.end(errorMsg);
     });
 
     proxyReq.on('timeout', () => {
-      if (requestCompleted) return;
-      requestCompleted = true;
+      if (responseSent) return;
+      responseSent = true;
       proxyReq.destroy();
-      res.writeHead(504, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({
+      const errorMsg = JSON.stringify({
         success: false,
-        error: '请求超时'
-      }));
+        error: '请求超时（15秒）'
+      });
+      res.writeHead(504, { 
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Length': Buffer.byteLength(errorMsg)
+      });
+      res.end(errorMsg);
     });
 
     return;
   }
 
-  res.writeHead(404);
-  res.end('Not Found');
+  const notFoundMsg = '404 Not Found';
+  res.writeHead(404, { 'Content-Length': Buffer.byteLength(notFoundMsg) });
+  res.end(notFoundMsg);
 });
 
 function removeAds(html) {
